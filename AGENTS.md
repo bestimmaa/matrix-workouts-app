@@ -154,11 +154,43 @@ while Health Connect stores `ExerciseSessionRecord` as a *sibling* of independen
 "a session window plus N labelled series" maps down to both, and that is what core's
 export document is.
 
-**Charts do not come from the extension.** They live in `chrome/src/charts/` as SVG
-path geometry against the DOM. If this app wants them, the honest move is to promote
-the geometry into core — which is already platform-free — rather than fork it.
+**Charts come from core, and are not written here.** The chart geometry was never
+DOM code — it emits path `d` strings, tick positions and scales, and its layer rule
+has always been `mayUse: []`. It was promoted out of the extension into
+`matrix-workouts-core` for this app, so both renderers draw the same panels from the
+same source: the extension through the DOM, this app through `react-native-svg`. A
+`d` string is a `d` string in either. **Do not add chart maths to this repo** — if a
+panel needs something the geometry cannot express, it goes in core, where a test can
+run it against every fixture with no renderer at all.
 
 ---
+
+## The stack
+
+| Need | Choice |
+|---|---|
+| Runtime | Expo, **dev build** — Expo Go cannot load the native module |
+| Navigation | `expo-router` |
+| Charts | `react-native-svg`, rendering core's geometry |
+| Token storage | `expo-secure-store` (Keychain) |
+| Native | Expo Modules API, a local Swift module |
+| Tests | `vitest`, matching all three siblings |
+| State / data fetching | **nothing** |
+
+**No state library and no query library, deliberately.** The app makes one network
+request and has four screens. Reach for either only when there is a second thing to
+coordinate; today there is not.
+
+**`fixtures/` is a copy, and that is the house convention, not a shortcut.** Core does
+not publish its fixtures — its `files` field is `dist` plus four markdown files — and
+chrome and mcp each keep their own copy (mcp only a three-fixture subset). Copy the
+ones the mapper needs and leave core's `files` alone.
+
+**Minimum deployment target is iOS 17**, because `cyclingPower`, `cyclingCadence` and
+`cyclingSpeed` are iOS 17+ and they are three of the six things this app exists to
+write. The alternative — gating them behind `#available` and degrading — buys support
+for hardware nobody here is running, at the price of a branch that would never be
+exercised and would therefore never be known to work.
 
 ## The write
 
