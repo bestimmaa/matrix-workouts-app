@@ -1,0 +1,69 @@
+name: iOS build
+
+# Compiles the Swift module and the generated project for the Simulator. It does not
+# run anything — HealthKit writes still need a person looking at the Health app —
+# but a Swift change that does not compile fails here instead of on someone's Mac.
+#
+# macOS minutes are expensive, so this runs only when something that reaches Xcode
+# changes: the native module, the app config and its plugins, or the dependency set
+# (a package with native code arrives through package.json). A pure TypeScript
+# change cannot break the Xcode build and is covered by ci.yml.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "app.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "modules/**"
+      - "app.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      # Continuous Native Generation: ios/ is rebuilt from app.json and the config
+      # plugins, exactly as a contributor would. On macOS this also runs pod install.
+      - run: npm run prebuild
+      - name: Check the generated project carries what the plugins promise
+        run: |
+          grep -q "com.apple.developer.healthkit" ios/MatrixWorkouts/MatrixWorkouts.entitlements
+          grep -q "NSHealthUpdateUsageDescription" ios/MatrixWorkouts/Info.plist
+          if grep -q "NSHealthShareUsageDescription" ios/MatrixWorkouts/Info.plist; then
+            echo "::error::The app is write-only; a read usage string means a read permission crept in."
+            exit 1
+          fi
+      - name: Build for the Simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -workspace ios/MatrixWorkouts.xcworkspace \
+            -scheme MatrixWorkouts \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild.log | grep -E "error:|warning: .*HealthWrite|BUILD (SUCCEEDED|FAILED)"
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          if-no-files-found: ignore

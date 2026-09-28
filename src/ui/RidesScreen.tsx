@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { router, Stack } from "expo-router";
 import type { HistoryResult } from "matrix-workouts-core";
-import { loadRides, signOut, storedCredentials } from "./session";
+import { loadRides, SessionExpired, signOut, storedCredentials } from "./session";
 import { formatDate, formatDuration, formatKm, modeLabel, usePalette } from "./theme";
 
 /** The list exists to pick a ride to export. It is not a history browser. */
@@ -19,6 +19,7 @@ export default function RidesScreen() {
       setError(null);
       setResult(await loadRides(credentials, refresh));
     } catch (e) {
+      if (e instanceof SessionExpired) return router.replace({ pathname: "/", params: { expired: "1" } });
       setError(e instanceof Error ? e.message : "Could not load rides.");
     }
   }, []);
