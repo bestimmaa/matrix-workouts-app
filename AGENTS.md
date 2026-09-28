@@ -78,8 +78,10 @@ own releases.
 **Scaffolded, not yet run on a device.** The mapper is written and tested against
 every fixture; the Swift module, the four screens and the config plugin are written,
 prebuild emits the entitlement and iOS 17 target, and Metro bundles the app. The
-Swift has not been compiled yet — nothing here has been built by Xcode. The
-decisions below were taken before the code, not discovered in it.
+Swift has not been compiled on a developer's Mac yet; `.github/workflows/ios.yml`
+builds it for the Simulator on macOS whenever something that reaches Xcode changes,
+and its first green run is the first proof it compiles. No ride has been written to
+Health yet. The decisions below were taken before the code, not discovered in it.
 
 ---
 
@@ -159,6 +161,14 @@ Native's global `fetch` satisfies unchanged. So core runs in Hermes verbatim, an
 Kotlin Multiplatform and Flutter all mean reimplementing a parser that is currently
 pinned by a fixture corpus and a contract test. That is the entire argument; it is
 not a general preference for cross-platform tooling.
+
+**The bridge's two sides are held together by a test, not a compiler.** Expo decodes
+the payload into Swift `Record` structs and fills any `@Field` it cannot find with its
+default, silently — a renamed key does not fail, it writes a workout that starts in
+1970 with no samples. `src/native/bridge.test.ts` reads the Swift source and checks
+every fixture's payload against the structs, and the JS declaration against the
+registered functions. Change one side of the bridge and that test tells you about the
+other. The Xcode build in CI cannot catch this; it compiles each side alone.
 
 **The bridge stays dumb.** `map/` resolves everything — activity type, unit
 conversion, sample windows, zero-suppression, the energy split — and hands the native

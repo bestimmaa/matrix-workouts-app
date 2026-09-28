@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { buildPanel, elapsedScale, planWorkout, workoutExport } from "matrix-workouts-core";
+import { buildPanel, elapsedScale, planWorkout, workoutExport, type Workout } from "matrix-workouts-core";
 import { mapWorkout, SHARE_TYPES } from "../map/workout";
 import { HealthWrite } from "../native/healthWrite";
 import { Panel } from "./Panel";
-import { rideById } from "./session";
+import { loadRide, SessionExpired, storedCredentials } from "./session";
 import { formatDate, formatDuration, formatKm, modeLabel, usePalette } from "./theme";
 
 /**
@@ -15,10 +15,31 @@ import { formatDate, formatDuration, formatKm, modeLabel, usePalette } from "./t
 export default function RideScreen() {
   const palette = usePalette();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const workout = rideById(id);
+  // undefined while loading, null when there is no such ride to show.
+  const [workout, setWorkout] = useState<Workout | null | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [includeEnergy, setIncludeEnergy] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    loadRide(id)
+      .then(async (w) => {
+        if (!live) return;
+        // Signed out is not "no such ride": a deep link opened cold belongs at sign-in.
+        if (!w && !(await storedCredentials())) return router.replace("/");
+        setWorkout(w);
+      })
+      .catch((e) => {
+        if (!live) return;
+        if (e instanceof SessionExpired) return router.replace({ pathname: "/", params: { expired: "1" } });
+        setLoadError(e instanceof Error ? e.message : "Could not load this ride.");
+      });
+    return () => {
+      live = false;
+    };
+  }, [id]);
 
   const panels = useMemo(() => {
     if (!workout) return [];
@@ -27,11 +48,20 @@ export default function RideScreen() {
     return plan.panels.map((spec) => buildPanel(spec, x, plan.elapsedSeconds));
   }, [workout]);
 
-  if (!workout) {
-    // The history lives in memory only; a cold deep link has nothing to show.
+  if (workout === undefined && !loadError) {
     return (
       <View style={[styles.center, { backgroundColor: palette.bg }]}>
-        <Text style={{ color: palette.muted }}>This ride is not loaded. Go back to the list.</Text>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (!workout) {
+    return (
+      <View style={[styles.center, { backgroundColor: palette.bg }]}>
+        <Text style={{ color: loadError ? palette.danger : palette.muted }}>
+          {loadError ?? "There is no bike ride with this id on your account."}
+        </Text>
       </View>
     );
   }

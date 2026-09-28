@@ -17,3 +17,16 @@ The version history source of truth is git tags in the format `vMAJOR.MINOR.PATC
 - `modules/health-write`: a local Expo module in Swift that writes the payload with
   `HKWorkoutBuilder`, requests share authorization only, and owns the HealthKit
   entitlement through a config plugin.
+- An iOS workflow that prebuilds and compiles the app for the Simulator on macOS,
+  and checks the generated project is write-only.
+- A contract test holding the TypeScript payload to the Swift `Record` structs, and
+  the JS bridge declaration to the registered native functions.
+- Tests for sign-in and the ride list: only the id and token reach the Keychain, only
+  bikes are offered, an expired token signs the rider out.
+
+### Fixed
+
+- An expired sign-in now returns to the sign-in screen and says so, instead of showing
+  core's message about reloading the site.
+- Opening a ride with nothing loaded (a deep link, a cold start) fetches the history
+  instead of showing "This ride is not loaded".

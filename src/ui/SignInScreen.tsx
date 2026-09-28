@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { router } from "expo-router";
-import { signIn, storedCredentials } from "./session";
+import { router, useLocalSearchParams } from "expo-router";
+import { SessionExpired, signIn, storedCredentials } from "./session";
 import { usePalette } from "./theme";
 
 /**
@@ -14,7 +14,8 @@ export default function SignInScreen() {
   const [xid, setXid] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { expired } = useLocalSearchParams<{ expired?: string }>();
+  const [error, setError] = useState<string | null>(expired ? new SessionExpired().message : null);
 
   useEffect(() => {
     storedCredentials().then((c) => (c ? router.replace("/rides") : setChecking(false)));
