@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Matrix Workouts",
+    "slug": "matrix-workouts-app",
+    "scheme": "matrixworkouts",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "platforms": [
+      "ios"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.bestimmaa.matrixworkouts",
+      "supportsTablet": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ],
+      "./modules/health-write/app.plugin.js"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

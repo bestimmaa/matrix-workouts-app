@@ -1,0 +1,43 @@
+{
+  "name": "matrix-workouts-app",
+  "version": "0.0.1",
+  "description": "An iOS app that writes a Matrix Fitness ride into Apple Health, per-10-second series intact.",
+  "license": "MIT",
+  "author": "Christoph Halang",
+  "private": true,
+  "main": "expo-router/entry",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bestimmaa/matrix-workouts-app.git"
+  },
+  "scripts": {
+    "start": "expo start --dev-client",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild --platform ios --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "expo": "~57.0.25",
+    "expo-build-properties": "~57.0.22",
+    "expo-constants": "~57.0.19",
+    "expo-linking": "~57.0.11",
+    "expo-router": "~57.0.23",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "matrix-workouts-core": "^0.2.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

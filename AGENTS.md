@@ -54,18 +54,32 @@ npm test            # vitest run — the mapper, against core's fixtures
 npm run typecheck   # tsc --noEmit
 ```
 
-The build and device commands land when the project is scaffolded; do not invent
-them here before they exist. Note that the native module means **Expo Go will not
-run this app** — it needs a dev build (`expo prebuild` + a local run), and the
-HealthKit entitlement plus `NSHealthUpdateUsageDescription` are wired through a
-config plugin so `prebuild` does not blow them away.
+To run it:
+
+```
+npm run prebuild    # expo prebuild --platform ios --clean — regenerates ios/
+npm run ios         # expo run:ios — builds the dev client, installs, starts Metro
+npm start           # Metro only, for a dev client that is already installed
+npx expo-doctor     # dependency and config sanity; should report no issues
+```
+
+The native module means **Expo Go will not run this app** — it needs a dev build.
+Building needs Xcode and CocoaPods. HealthKit works in the Simulator, so a device is
+not required to see a write land; Health on the Simulator is empty until you do.
+
+Add dependencies with `npx expo install`, not `npm install`, so the version matches
+the SDK. The one exception is `matrix-workouts-core`, which is ours and follows its
+own releases.
 
 ---
 
 ## Status
 
-**Not built.** This file is the spec that precedes it. Everything below is a decision
-already taken, not a menu.
+**Scaffolded, not yet run on a device.** The mapper is written and tested against
+every fixture; the Swift module, the four screens and the config plugin are written,
+prebuild emits the entitlement and iOS 17 target, and Metro bundles the app. The
+Swift has not been compiled yet — nothing here has been built by Xcode. The
+decisions below were taken before the code, not discovered in it.
 
 ---
 
@@ -117,18 +131,25 @@ exported?" answerable without having kept a ledger nobody wrote.
 matrix-workouts-core    the record: parse, api, export. An npm dependency.
 src/
   map/      WorkoutExport -> a resolved HealthKit payload. No native, no React.
-  ui/       React Native screens
+  ui/       React Native screens and the chart panel
   native/   the JS side of the bridge, and nothing else
+  app/      expo-router routes — one-line re-exports of ui/ screens, because
+            expo-router requires a routes directory and the screens live in ui/
 modules/
-  health-write/ios/     the Swift. An Expo local module, so it is source, not
-                        generated, and it is tracked.
+  health-write/
+    ios/            the Swift. An Expo local module, so it is source, not
+                    generated, and it is tracked.
+    app.plugin.js   the HealthKit entitlement and NSHealthUpdateUsageDescription
+fixtures/   raw records copied from core
 ```
 
-The generated app project (`ios/`, from `expo prebuild`) is a separate thing from
-the module above, and **whether it is committed or regenerated is an open decision** —
-left to whoever scaffolds this. `.gitignore` deliberately does not ignore it yet,
-because ignoring a directory that might hold hand-written Swift is how that Swift
-disappears quietly.
+**`ios/` is generated and ignored** — Continuous Native Generation. Every
+hand-written native line is in `modules/health-write/`, and everything the generated
+project must carry comes from `app.json` and config plugins: the entitlement and
+usage string from the module's own plugin, the iOS 17 target from
+`expo-build-properties`. So `prebuild --clean` can always rebuild `ios/` from
+scratch, and a change made by hand inside it is a change that will be lost. If
+something seems to need a hand edit there, it needs a config plugin instead.
 
 **React Native, and the reason is specific.** Core is TypeScript with
 `dependencies: {}`, no DOM, no `node:`, and — deliberately — no `fetch`: networking
@@ -184,7 +205,9 @@ coordinate; today there is not.
 **`fixtures/` is a copy, and that is the house convention, not a shortcut.** Core does
 not publish its fixtures — its `files` field is `dist` plus four markdown files — and
 chrome and mcp each keep their own copy (mcp only a three-fixture subset). Copy the
-ones the mapper needs and leave core's `files` alone.
+ones the mapper needs and leave core's `files` alone. The mapper needs all of them:
+its tests assert the distance, window and heart-rate rules on every raw record, so
+`fixtures/` holds every `raw-*.json` core has, and none of the CSVs.
 
 **Minimum deployment target is iOS 17**, because `cyclingPower`, `cyclingCadence` and
 `cyclingSpeed` are iOS 17+ and they are three of the six things this app exists to
@@ -234,11 +257,24 @@ to close it.
 
 **Use each sample's own `duration` for its window, and never `index * 10`.** The
 final sample is a partial, and it is *not* reliably zero — 0, 1, 2, 3, 5, 6, 7, 8, 10
-and 11 seconds have all been observed. Two consequences for the write: a zero-width
-sample cannot express a cumulative quantity, so **exclude a zero-duration final
-sample from `distanceCycling` and `activeEnergyBurned`** while still using it as an
-instant reading for the discrete series; and a non-zero partial is a real interval
-that must not be rounded up to ten.
+and 11 seconds have all been observed. Three consequences for the write:
+
+- a non-zero partial is a real interval that must not be rounded up to ten;
+- a zero-width sample cannot express a cumulative quantity, so **a zero-duration
+  final sample gets no window of its own in `distanceCycling` or
+  `activeEnergyBurned`**, while still counting as an instant reading for the
+  discrete series;
+- **but its distance is not dropped.** On every fixture that ends on a 0 s sample,
+  that sample still advances `cumulativeDistanceMeters` — by 16 to 113 m, the
+  console's closing figure. Discarding it would under-report the ride by as much as
+  the quantization error above. The delta is folded into the preceding window, so
+  the series still sums to the console's running total. (Energy needs no such
+  fold: a zero-duration window has zero weight in the power × duration split.)
+
+The export document does not carry per-sample `duration`. Every window but the last
+is the gap to the next sample's `elapsedSeconds`, which is exactly the upstream
+duration; the last one is read from `source.record` through core's
+`camelizeWorkout`. If core ever adds a duration to `Sample`, use that instead.
 
 **Never map `totalSteps`, and never map `inclinePercent`.** Steps are nonzero on
 every bike fixture — 1991 on a twenty-minute ride — because the field is a crank
@@ -250,16 +286,24 @@ a flat zero series is worse than no series.
 structs, so an absent channel reads as `0` rather than null.
 
 - *Whole-series suppression* — if a channel is zero across the entire workout, do not
-  write that type at all. Fixture `raw-6a998daf` has no heart rate across all 362
-  samples; 362 zero-bpm samples in Health is worse than silence.
+  write that type at all; a ride's worth of zero-bpm samples in Health is worse than
+  silence. No fixture actually lacks a channel, so the test for this is synthetic.
 - *Per-sample dropout* — inside a channel that mostly has data, a zero is a dropout:
   drop the sample, keep the series. Not an edge case, and sometimes most of the ride
    — core measures rejection rates up to 231 of 376 samples on a strap that died
   mid-session. Use core's `heartRateValid` rather than inventing a second threshold.
 
-**The activity-type mapper must not throw.** Fixture `raw-6a998daf` has
-`machineType: undefined`. `.cycling` is the right fallback given the corpus and the
-scope wall above.
+**The activity-type mapper must not throw.** Core reports a record with no machine
+type as `"unknown"`, and `isSupportedMachine` lets it through, so the mapper will see
+one sooner or later. `.cycling` is the right fallback given the corpus and the scope
+wall above. No fixture is missing its machine type; that test is synthetic too.
+
+**Read the record through core, never by key.** `raw-6a998daf` is the one fixture in
+snake_case, captured from the API. Read it with camelCase keys and it looks like a
+ride with no machine type and no heart rate — which is what an earlier version of
+this file claimed about it. It has both: `machine_type: upright_bike`, and 235 valid
+heart-rate samples. Anything that has to touch `source.record` goes through
+`camelizeWorkout` first.
 
 ---
 
