@@ -29,7 +29,9 @@ export default function ExportedScreen() {
         </Text>
       ) : null}
       <Pressable
-        onPress={() => router.replace("/rides")}
+        // The ride screen was replaced by this one, so the list is still underneath:
+        // `replace` would stack a second list on it, with a back button to the first.
+        onPress={() => router.dismissTo("/rides")}
         style={({ pressed }) => [styles.button, { backgroundColor: palette.accent, opacity: pressed ? 0.6 : 1 }]}
       >
         <Text style={styles.buttonText}>Back to rides</Text>

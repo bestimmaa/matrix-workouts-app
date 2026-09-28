@@ -67,6 +67,21 @@ The native module means **Expo Go will not run this app** — it needs a dev bui
 Building needs Xcode and CocoaPods. HealthKit works in the Simulator, so a device is
 not required to see a write land; Health on the Simulator is empty until you do.
 
+Gotchas from the first local run:
+
+- **`pod install` crashes with `Unicode Normalization not appropriate for ASCII-8BIT`**
+  when the shell has no UTF-8 locale (CocoaPods 1.17 on Homebrew Ruby 4). `prebuild`
+  then leaves `ios/` without pods. Export `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8` first.
+- **Don't tap the dev build's "Open debugger to view warnings" toast.** It launches
+  React Native DevTools, which pauses JS. The app then looks frozen: taps do nothing
+  and switches don't move, which is easy to mistake for an app bug.
+- **Check a write in the store, not the Health app.** The Simulator's Health app opens
+  on an onboarding flow that asks for personal details. The data itself is in
+  `~/Library/Developer/CoreSimulator/Devices/<udid>/data/Library/Health/healthdb_secure.sqlite`
+  (`samples`, `quantity_samples`, `workout_activities`, `metadata_values`; dates are
+  seconds since 2001). The HKDevice is in `source_devices` in `healthdb.sqlite`. Copy
+  both files with their `-wal` before querying. Heart rate is stored in count/s.
+
 Add dependencies with `npx expo install`, not `npm install`, so the version matches
 the SDK. The one exception is `matrix-workouts-core`, which is ours and follows its
 own releases.
@@ -75,13 +90,32 @@ own releases.
 
 ## Status
 
-**Scaffolded, not yet run on a device.** The mapper is written and tested against
-every fixture; the Swift module, the four screens and the config plugin are written,
-prebuild emits the entitlement and iOS 17 target, and Metro bundles the app. The
-Swift has not been compiled on a developer's Mac yet; `.github/workflows/ios.yml`
-builds it for the Simulator on macOS whenever something that reaches Xcode changes,
-and its first green run is the first proof it compiles. No ride has been written to
-Health yet. The decisions below were taken before the code, not discovered in it.
+**Runs in the Simulator; not yet on a device.** The Swift compiles, both in
+`.github/workflows/ios.yml` (Xcode 26.6, `macos-26`) and locally, and a real ride has
+been written to Health and checked there. The decisions below were taken before the
+code; the first write confirmed them rather than changing them.
+
+**Verified 2026-09-28**, iPhone 17 Pro Simulator (iOS 26.4), one 15:01 target-heart-rate
+ride (`6ab162e7…`, 89 samples, final sample 0 s), checked in the Simulator's HealthKit
+store rather than by eye:
+
+- The authorization sheet listed write access only (workouts plus the six types) and no
+  read section.
+- The workout was Indoor Cycling (`13`/`2`) with duration 901 s, `HKIndoorWorkout`, and
+  `HKExternalUUID` = the Matrix id. The device was "Matrix console" / Matrix Fitness /
+  `upright_bike`, with the machine id as `localIdentifier`.
+- Distance: 88 samples summing to 6823.6 m, exactly the record's final
+  `cumulativeDistanceMeters`. The platform says 6.97 km. The 146 m residual is the
+  console's own: its duration runs 21 s past the last interval.
+- Power, cadence and speed: 89 samples each, including the 0 s final instant, which
+  HealthKit accepted. Heart rate: 72 samples (89 minus the 17 dropouts), no zeros.
+  Active energy: 88 power-shaped samples summing to exactly 126 kcal. No step samples.
+- A second export with energy off wrote a second workout without energy. An export
+  with heart rate switched off in Settings wrote everything else, and the done screen
+  named heart rate.
+
+Not yet exercised: a physical device, a ride with no machine id (`localIdentifier: null`),
+and a non-zero final partial sample.
 
 ---
 
