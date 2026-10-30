@@ -18,7 +18,11 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(expired ? new SessionExpired().message : null);
 
   useEffect(() => {
-    storedCredentials().then((c) => (c ? router.replace("/rides") : setChecking(false)));
+    // A Keychain read can fail (locked device, damaged entry). That is a sign-in
+    // form, not a spinner that never ends.
+    storedCredentials()
+      .then((c) => (c ? router.replace("/rides") : setChecking(false)))
+      .catch(() => setChecking(false));
   }, []);
 
   async function submit() {

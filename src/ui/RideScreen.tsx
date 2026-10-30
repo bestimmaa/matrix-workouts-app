@@ -26,9 +26,10 @@ export default function RideScreen() {
     let live = true;
     loadRide(id)
       .then(async (w) => {
-        if (!live) return;
         // Signed out is not "no such ride": a deep link opened cold belongs at sign-in.
-        if (!w && !(await storedCredentials())) return router.replace("/");
+        const signedOut = !w && !(await storedCredentials());
+        if (!live) return;
+        if (signedOut) return router.replace("/");
         setWorkout(w);
       })
       .catch((e) => {

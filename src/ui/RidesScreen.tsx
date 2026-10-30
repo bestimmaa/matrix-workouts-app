@@ -13,10 +13,10 @@ export default function RidesScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (refresh: boolean) => {
-    const credentials = await storedCredentials();
-    if (!credentials) return router.replace("/");
     try {
       setError(null);
+      const credentials = await storedCredentials();
+      if (!credentials) return router.replace("/");
       setResult(await loadRides(credentials, refresh));
     } catch (e) {
       if (e instanceof SessionExpired) return router.replace({ pathname: "/", params: { expired: "1" } });
