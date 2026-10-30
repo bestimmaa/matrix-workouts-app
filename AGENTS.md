@@ -50,7 +50,7 @@ instead — and when the two disagree, the file that owns the subject wins.
 Run these before committing. **`npm test` must pass.**
 
 ```
-npm test            # vitest run — the mapper, against core's fixtures
+npm test            # vitest run — the mapper, the bridge contract and the session, against core's fixtures
 npm run typecheck   # tsc --noEmit
 ```
 
@@ -171,6 +171,7 @@ src/
   native/   the JS side of the bridge, and nothing else
   app/      expo-router routes — one-line re-exports of ui/ screens, because
             expo-router requires a routes directory and the screens live in ui/
+  test/     the fixture loader the test files share. Not app code.
 modules/
   health-write/
     ios/            the Swift. An Expo local module, so it is source, not

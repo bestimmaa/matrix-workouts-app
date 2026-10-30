@@ -30,3 +30,7 @@ The version history source of truth is git tags in the format `vMAJOR.MINOR.PATC
   core's message about reloading the site.
 - Opening a ride with nothing loaded (a deep link, a cold start) fetches the history
   instead of showing "This ride is not loaded".
+- Signing out while the ride list was still loading no longer leaves that account's
+  rides for the next sign-in: the in-memory history is keyed by account.
+- A Keychain read that fails shows the sign-in form instead of a spinner that never
+  ends.
