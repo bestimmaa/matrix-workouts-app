@@ -5,6 +5,7 @@ import {
   isSupportedMachine,
   loginWithXid,
   type Credentials,
+  type FetchLike,
   type HistoryResult,
   type Workout,
 } from "matrix-workouts-core";
@@ -20,9 +21,8 @@ import {
 
 const KEY = "matrix-credentials";
 
-/** RN's global fetch satisfies core's three-member FetchLike unchanged. */
-const fetchImpl = (url: string, init: { headers: Record<string, string>; method?: string; body?: string }) =>
-  fetch(url, init);
+/** RN's global fetch satisfies core's three-member FetchLike unchanged. Resolved per call, not at import. */
+const fetchImpl: FetchLike = (url, init) => fetch(url, init);
 
 export async function signIn(xid: string, pin: string): Promise<void> {
   const credentials = await loginWithXid({ xid, pin }, fetchImpl);
@@ -41,7 +41,7 @@ export async function storedCredentials(): Promise<Credentials | null> {
 }
 
 export async function signOut(): Promise<void> {
-  history = null;
+  cache = null;
   await SecureStore.deleteItemAsync(KEY);
 }
 
@@ -57,11 +57,18 @@ export class SessionExpired extends Error {
   }
 }
 
-let history: HistoryResult | null = null;
+/**
+ * The one history, remembered with the account it was fetched for. Keyed, because
+ * module state outlives a sign-out: a fetch still in flight when the rider signs out
+ * lands after the cache was cleared, and an unkeyed cache would then hand that
+ * account's rides to whoever signs in next.
+ */
+let cache: { exerciserId: string; history: HistoryResult } | null = null;
 
 /** Indoor bikes only — core's scope wall. Newest first, as core returns them. */
 export async function loadRides(credentials: Credentials, refresh = false): Promise<HistoryResult> {
-  if (!history || refresh) {
+  if (!cache || cache.exerciserId !== credentials.exerciserId || refresh) {
+    let history: HistoryResult;
     try {
       history = await fetchWorkoutHistory(credentials, fetchImpl);
     } catch (e) {
@@ -71,12 +78,10 @@ export async function loadRides(credentials: Credentials, refresh = false): Prom
       }
       throw e;
     }
+    cache = { exerciserId: credentials.exerciserId, history };
   }
+  const { history } = cache;
   return { ...history, workouts: history.workouts.filter((w) => isSupportedMachine(w.machineType)) };
-}
-
-function rideById(id: string): Workout | null {
-  return history?.workouts.find((w) => w.id === id) ?? null;
 }
 
 /**
@@ -85,8 +90,6 @@ function rideById(id: string): Workout | null {
  * Null when signed out, or when the account has no such bike ride.
  */
 export async function loadRide(id: string): Promise<Workout | null> {
-  const loaded = rideById(id);
-  if (loaded) return isSupportedMachine(loaded.machineType) ? loaded : null;
   const credentials = await storedCredentials();
   if (!credentials) return null;
   const { workouts } = await loadRides(credentials);

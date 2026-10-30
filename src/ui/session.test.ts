@@ -21,7 +21,8 @@ const bikeIds = raw.map((r) => toWorkout(r).id);
 const treadmill = { ...raw[0], workoutId: "treadmill-ride", machineType: "treadmill" };
 const treadmillId = toWorkout(treadmill).id;
 
-type Reply = { status: number; body?: unknown };
+/** `release` holds the reply back until the test lets it go — for a request still in flight. */
+type Reply = { status: number; body?: unknown; release?: Promise<void> };
 let replies: Reply[];
 let requests: { url: string; body?: string }[];
 
@@ -30,6 +31,7 @@ vi.stubGlobal("fetch", async (url: string, init: { body?: string }) => {
   requests.push({ url, body: init.body });
   const reply = replies.shift();
   if (!reply) throw new Error(`unexpected request to ${url}`);
+  await reply.release;
   return { ok: reply.status < 400, status: reply.status, json: async () => reply.body };
 });
 
@@ -117,6 +119,23 @@ describe("loadRides", () => {
       expect(keychain.size).toBe(0);
     });
   }
+
+  it("does not hand one account's rides to the next sign-in", async () => {
+    // Sign out while the history is still loading: the fetch lands after the cache
+    // was cleared. The next account must not be served from it.
+    const s = await session();
+    let release!: () => void;
+    replies.push({ ...HISTORY, release: new Promise<void>((r) => (release = r)) });
+    const pending = s.loadRides(credentials);
+    await s.signOut();
+    release();
+    await pending;
+
+    replies.push({ status: 200, body: { workouts: [] } });
+    const { workouts } = await s.loadRides({ exerciserId: "ex-2", token: "tok-2" });
+    expect(workouts).toEqual([]);
+    expect(requests).toHaveLength(2);
+  });
 
   it("keeps the sign-in through a server failure", async () => {
     const s = await session();
