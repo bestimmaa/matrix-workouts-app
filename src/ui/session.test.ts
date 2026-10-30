@@ -1,7 +1,6 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toWorkout } from "matrix-workouts-core";
+import { fixtureFiles, fixtureRecord } from "../test/fixtures";
 
 // The Keychain, as a Map. `session.ts` is the only thing that touches it.
 const keychain = new Map<string, string>();
@@ -11,10 +10,7 @@ vi.mock("expo-secure-store", () => ({
   deleteItemAsync: async (key: string) => void keychain.delete(key),
 }));
 
-const FIXTURES = join(__dirname, "../../fixtures");
-const raw = readdirSync(FIXTURES)
-  .filter((f) => f.startsWith("raw-") && f.endsWith(".json"))
-  .map((f) => JSON.parse(readFileSync(join(FIXTURES, f), "utf8")) as Record<string, unknown>);
+const raw = fixtureFiles.map(fixtureRecord);
 const bikeIds = raw.map((r) => toWorkout(r).id);
 
 // Out of scope for export; the list must not offer it.
