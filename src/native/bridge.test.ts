@@ -1,8 +1,9 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { toWorkout, workoutExport } from "matrix-workouts-core";
 import { mapWorkout } from "../map/workout";
+import { fixtureFiles, fixtureRecord } from "../test/fixtures";
 
 /**
  * The bridge has two sides that no compiler checks against each other: the payload
@@ -64,13 +65,10 @@ function conforms(struct: string, value: Record<string, unknown>): string[] {
   return problems;
 }
 
-const FIXTURES = join(__dirname, "../../fixtures");
-const payloads = readdirSync(FIXTURES)
-  .filter((f) => f.startsWith("raw-") && f.endsWith(".json"))
-  .flatMap((f) => {
-    const doc = workoutExport(toWorkout(JSON.parse(readFileSync(join(FIXTURES, f), "utf8"))), new Date());
-    return [true, false].map((includeActiveEnergy) => ({ f, payload: mapWorkout(doc, { includeActiveEnergy }) }));
-  });
+const payloads = fixtureFiles.flatMap((f) => {
+  const doc = workoutExport(toWorkout(fixtureRecord(f)), new Date());
+  return [true, false].map((includeActiveEnergy) => ({ f, payload: mapWorkout(doc, { includeActiveEnergy }) }));
+});
 
 describe("the payload matches the Swift records", () => {
   it("finds the structs it is checking", () => {

@@ -1,17 +1,20 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { HK_TYPE, type HealthQuantityType } from "../map/payload";
 import { usePalette } from "./theme";
 
-const NAMES: Record<string, string> = {
-  HKQuantityTypeIdentifierDistanceCycling: "Distance",
-  HKQuantityTypeIdentifierCyclingPower: "Power",
-  HKQuantityTypeIdentifierCyclingCadence: "Cadence",
-  HKQuantityTypeIdentifierCyclingSpeed: "Speed",
-  HKQuantityTypeIdentifierHeartRate: "Heart rate",
-  HKQuantityTypeIdentifierActiveEnergyBurned: "Active energy",
+/** What each written type is called on this screen. Keyed by `HK_TYPE`, so it cannot drift from the payload. */
+const NAMES: Record<HealthQuantityType, string> = {
+  [HK_TYPE.distanceCycling]: "Distance",
+  [HK_TYPE.cyclingPower]: "Power",
+  [HK_TYPE.cyclingCadence]: "Cadence",
+  [HK_TYPE.cyclingSpeed]: "Speed",
+  [HK_TYPE.heartRate]: "Heart rate",
+  [HK_TYPE.activeEnergyBurned]: "Active energy",
 };
 
-const names = (list?: string) => (list ? list.split(",").filter(Boolean).map((t) => NAMES[t] ?? t) : []);
+const names = (list?: string) =>
+  list ? list.split(",").filter(Boolean).map((t) => NAMES[t as HealthQuantityType] ?? t) : [];
 
 export default function ExportedScreen() {
   const palette = usePalette();

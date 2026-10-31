@@ -1,19 +1,12 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { toWorkout, workoutExport, type WorkoutExport } from "matrix-workouts-core";
+import { fixtureFiles as files, fixtureRecord } from "../test/fixtures";
 import { HK_ACTIVITY_CYCLING, HK_LOCATION_INDOOR, HK_TYPE, type HealthWorkoutPayload } from "./payload";
 import { mapWorkout, SHARE_TYPES } from "./workout";
 
-const FIXTURES = join(__dirname, "../../fixtures");
 const NOW = new Date("2026-09-28T00:00:00Z");
 
-function load(file: string): WorkoutExport {
-  const record = JSON.parse(readFileSync(join(FIXTURES, file), "utf8")) as Record<string, unknown>;
-  return workoutExport(toWorkout(record), NOW);
-}
-
-const files = readdirSync(FIXTURES).filter((f) => f.startsWith("raw-") && f.endsWith(".json"));
+const load = (file: string): WorkoutExport => workoutExport(toWorkout(fixtureRecord(file)), NOW);
 const byId = (prefix: string) => load(files.find((f) => f.startsWith(`raw-${prefix}`))!);
 
 function series(payload: HealthWorkoutPayload, type: string) {
